@@ -420,12 +420,18 @@
       
       function removeClippedCode(data, language) {
 
-        const regexMap = {
-          js: /\/\/beginclip[\s\S]*?\/\/endclip/g,
-          css: /\/\*beginclip\*\/[\s\S]*?\/\*endclip\*\//g,
-          html: /<!--beginclip-->[\s\S]*?<!--endclip-->/g,
-        }; // This line produces a linter error but it totally fine.
+//        const regexMap = {
+//          js: /\/\/beginclip[\s\S]*?\/\/endclip/g,
+//          css: /\/\*beginclip\*\/[\s\S]*?\/\*endclip\*\//g,
+//          html: /<!--beginclip-->[\s\S]*?<!--endclip-->/g,
+//        }; // This line produces a linter error but it totally fine.
         
+        const regexMap = {
+          js: /^\s*\/\/beginclip[\s\S]*?^\s*\/\/endclip/gm,
+          css: /^\s*\/\*beginclip\*\/[\s\S]*?^\s*\/\*endclip\*\//gm,
+          html: /^\s*<!--beginclip-->[\s\S]*?^\s*<!--endclip-->/gm,
+        };
+
         const regex = regexMap[language];
         if (!regex) return data;
         return data.replace(regex, '');
