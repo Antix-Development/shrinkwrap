@@ -412,7 +412,12 @@
       const queueNextLinkedScriptForLoading = e => {
         if (linkedScripts.length) {
           loadLinkedScript(linkedScripts.shift()); // Load the next file. We use shift because the files will be in the reverse order.
+
         } else {
+
+          // js1.value = remapJavascript(js1.value); // Perform custom replacements.
+          // js1.value = removeClippedCode(js1.value, 'js');
+
           log('preprocessing completed.\n\nSet options and click "ShrinkWrap" button to continue.\n');
           startMinificationButton.disabled = false;
         }
@@ -420,11 +425,11 @@
       
       function removeClippedCode(data, language) {
 
-//        const regexMap = {
-//          js: /\/\/beginclip[\s\S]*?\/\/endclip/g,
-//          css: /\/\*beginclip\*\/[\s\S]*?\/\*endclip\*\//g,
-//          html: /<!--beginclip-->[\s\S]*?<!--endclip-->/g,
-//        }; // This line produces a linter error but it totally fine.
+        // const regexMap = {
+        //   js: /\/\/beginclip[\s\S]*?\/\/endclip/g,
+        //   css: /\/\*beginclip\*\/[\s\S]*?\/\*endclip\*\//g,
+        //   html: /<!--beginclip-->[\s\S]*?<!--endclip-->/g,
+        // }; // This line produces a linter error but it totally fine.
         
         const regexMap = {
           js: /^\s*\/\/beginclip[\s\S]*?^\s*\/\/endclip/gm,
@@ -437,21 +442,50 @@
         return data.replace(regex, '');
       }
 
+      // function remapJavascript(data) {
+      //   if (!data.trim().startsWith('/*remap')) return data;
+      //   const remapBlockRegex = /^\s*\/\*remap([\s\S]*?)\*\//;
+      //   const match = data.match(remapBlockRegex);
+      //   if (!match) return data;
+      //   const replacements = match[1].split('\n').map(line => line.trim()).filter(line => line.includes(',')).map(line => {
+      //     const parts = line.split(',');
+      //     return { from: parts[0].trim(), to: parts[1].trim() };
+      //   }).filter(pair => pair.from && pair.to);
+      //   if (replacements.length === 0) return data;
+      //   let processedData = data;
+      //   for (const replacement of replacements) {
+      //     processedData = processedData.replaceAll(replacement.from, replacement.to);
+      //   }
+      //   // return processedData;
+      //   return processedData.substring(processedData.indexOf('*/') + 2);
+      // }
+
       function remapJavascript(data) {
         if (!data.trim().startsWith('/*remap')) return data;
+
         const remapBlockRegex = /^\s*\/\*remap([\s\S]*?)\*\//;
         const match = data.match(remapBlockRegex);
         if (!match) return data;
+        
         const replacements = match[1].split('\n').map(line => line.trim()).filter(line => line.includes(',')).map(line => {
           const parts = line.split(',');
           return { from: parts[0].trim(), to: parts[1].trim() };
         }).filter(pair => pair.from && pair.to);
+        
         if (replacements.length === 0) return data;
+        
         let processedData = data;
         for (const replacement of replacements) {
           processedData = processedData.replaceAll(replacement.from, replacement.to);
         }
-        return processedData;
+        
+        const endIndex = processedData.indexOf('*/');
+        if (endIndex === -1) return processedData;
+        
+        let result = processedData.substring(endIndex + 2);
+        // Remove any leading whitespace/newlines that might break syntax.
+        result = result.replace(/^\s*\n/, '');
+        return result || ' '; // Return a space instead of empty string.
       }
 
       // Recursively load linked scripts.
@@ -459,8 +493,17 @@
         log(`loading linked script (${filename})...`);
         loadTextfile(filename, data => {
           log('processing script');
-          data = remapJavascript(data); // Perform custom replacements.
+          
+          log(`Original length: ${data.length}`);
+          data = remapJavascript(data);
+          log(`After remap: ${data.length} chars`);
           data = removeClippedCode(data, 'js');
+          log(`After clip removal: ${data.length} chars`);
+          
+          if (data.trim() === '') {
+            log('WARNING: Script is empty after processing!');
+          }
+          
           js1.value += data;
           queueNextLinkedScriptForLoading();
         });
@@ -712,7 +755,13 @@
           let end = html.indexOf('<\/script>');
           if (start >= 0 && end >= 0) {
             log(`processing embedded script...`);
-            js1.value += html.slice(start + 8, end).trim() + '\n';
+            // js1.value += html.slice(start + 8, end).trim() + '\n';
+
+let scriptContent = html.slice(start + 8, end).trim() + '\n';
+scriptContent = remapJavascript(scriptContent);
+scriptContent = removeClippedCode(scriptContent, 'js');
+js1.value += scriptContent;
+
             html = html.substring(0, start) + html.substring(end + 9);
           } else { done = true; }
         }    
